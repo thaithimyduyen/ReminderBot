@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from typing import List
-from app.entities import Habbit
+from app.entities import Habit, Mark, StateHabit, MessageId, ChatId
 
 from telegram import (
     ParseMode,
@@ -18,13 +18,14 @@ class ReminderBotViewer:
         self._bot = bot
 
     @staticmethod
-    def _get_habbit_markup(habbits: List[Habbit]):
+    def _get_habit_markup(habits: List[Habit]):
         keyboard = []
-        for habbit in habbits:
+        for h in habits:
+            mark = Mark.DONE if h.state == StateHabit.DONE else Mark.NOT_DONE
             keyboard.append([
                 InlineKeyboardButton(
-                    text=habbit.name,
-                    callback_data="habbit"
+                    text=mark.value + h.name,
+                    callback_data="habits:"+str(habits.index(h))
                 )]
             )
         return InlineKeyboardMarkup(keyboard)
@@ -45,8 +46,8 @@ class ReminderBotViewer:
             reply_markup=reply_markup,
         )
 
-    def send_habbits(self, chat_id, habbits: List[Habbit]):
-        markup = self._get_habbit_markup(habbits)
+    def send_habits(self, chat_id, habits: List[Habit]):
+        markup = self._get_habit_markup(habits)
         return self._bot.send_message(
             chat_id=chat_id,
             text="*YOUR HABBITS:*",
@@ -62,4 +63,17 @@ class ReminderBotViewer:
             text=text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.MARKDOWN,
+        )
+
+    def update_habit(
+        self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        habits: List[Habit]
+    ) -> None:
+        markup = self._get_habit_markup(habits)
+        self._bot.edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=markup,
         )

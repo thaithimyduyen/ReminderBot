@@ -8,8 +8,9 @@ from telegram.ext import (
     Updater,
     Filters
 )
-
 from app.remindermodel import ReminderBotModel
+
+KEY_USER_HABBITS = "habits"
 
 
 class ReminderBotCotroller:
@@ -35,7 +36,7 @@ class ReminderBotCotroller:
         self._model.start(update, context)
 
     def _handle_text(self, update: Update, context: CallbackContext) -> None:
-        self._model.add_habbits(update, context)
+        self._model.add_habits(update, context)
 
     def _handle_button_clicked(
         self,
@@ -43,5 +44,13 @@ class ReminderBotCotroller:
         context: CallbackContext,
     ) -> None:
         query_data = update.callback_query.data
-        if query_data == "habit":
-            self._model.mark_habbit(update, context)
+        if query_data.startswith("habits:"):
+            self._model.mark_habits(
+                update=update,
+                context=context,
+                habit_id=int(trim_prefix(query_data, "habits:"))
+            )
+
+
+def trim_prefix(text, prefix):
+    return text[text.startswith(prefix) and len(prefix):]
