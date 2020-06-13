@@ -10,8 +10,6 @@ from telegram.ext import (
 )
 from app.remindermodel import ReminderBotModel
 
-KEY_USER_HABBITS = "habits"
-
 
 class ReminderBotCotroller:
     def __init__(self, model: ReminderBotModel, updater: Updater):
@@ -45,10 +43,26 @@ class ReminderBotCotroller:
     ) -> None:
         query_data = update.callback_query.data
         if query_data.startswith("habits:"):
-            self._model.mark_habits(
+            self._model.mark_habit(
                 update=update,
                 context=context,
-                habit_id=int(trim_prefix(query_data, "habits:"))
+                habit_id=trim_prefix(query_data, "habits:")
+            )
+        elif query_data.startswith("delete:"):
+            self._model.delete_habit(
+                update=update,
+                context=context,
+                habit_id=trim_prefix(query_data, "delete:")
+            )
+        elif query_data == "delete mode":
+            self._model.delete_mode(
+                update=update,
+                context=context,
+            )
+        elif query_data == "back":
+            self._model.normal_mode(
+                update=update,
+                context=context,
             )
 
 

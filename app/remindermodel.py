@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+from typing import List
 from telegram import Update, Bot
 from telegram.ext import CallbackContext
 
@@ -13,19 +15,30 @@ class ReminderBotModel:
         self._view = view
         self._bot = bot
 
-    def start(self, update: Update, context: CallbackContext):
-        self._view.send_message(
-            chat_id=update.effective_message.chat_id,
-            context=context,
-            text="Add your habits!!"
-        )
-
-    def add_habits(self, update: Update, context: CallbackContext) -> None:
-        habits_inp = update.effective_message.text.split("\n")
+    @staticmethod
+    def _habits(context: CallbackContext) -> List[Habit]:
         if KEY_USER_HABBITS not in context.user_data:
             context.user_data[KEY_USER_HABBITS] = []
 
-        habits = context.user_data[KEY_USER_HABBITS]
+        return context.user_data[KEY_USER_HABBITS]
+
+    def start(self, update: Update, context: CallbackContext) -> None:
+        habits = self._habits(context)
+
+        if len(habits) == 0:
+            self._view.send_message(
+                chat_id=update.effective_message.chat_id,
+                context=context,
+                text="Add your habits!!"
+            )
+            return
+
+        self._show_habits(update, context)
+
+    def add_habits(self, update: Update, context: CallbackContext) -> None:
+        habits = self._habits(context)
+
+        habits_inp = update.effective_message.text.splitlines()
 
         unique_habit_names = set()
         for h in habits:
@@ -37,20 +50,51 @@ class ReminderBotModel:
             unique_habit_names.add(h)
             habits.append(Habit(h))
 
-        self.show_habits(update, context)
+        self._show_habits(update, context)
 
-    def show_habits(self, update: Update, context: CallbackContext) -> None:
-        habits = context.user_data[KEY_USER_HABBITS]
+    def _show_habits(self, update: Update, context: CallbackContext) -> None:
+        habits = self._habits(context)
         self._view.send_habits(update.effective_message.chat_id, habits)
 
-    def mark_habits(
+    def normal_mode(self, update: Update, context: CallbackContext) -> None:
+        habits = self._habits(context)
+        self._view.update_habit(
+            chat_id=update.effective_message.chat_id,
+            message_id=update.effective_message.message_id,
+            habits=habits
+        )
+
+    def delete_mode(self, update: Update, context: CallbackContext) -> None:
+        habits = self._habits(context)
+        self._view.update_habit(
+            chat_id=update.effective_message.chat_id,
+            message_id=update.effective_message.message_id,
+            habits=habits,
+            is_state_delete=True,
+        )
+
+    def delete_habit(
         self,
         update: Update,
         context: CallbackContext,
-        habit_id: int,
+        habit_id: str,
     ) -> None:
-        habits = context.user_data[KEY_USER_HABBITS]
-        habits[habit_id].state = StateHabit.DONE
+        habits = self._habits(context)
+        for (i, h) in enumerate(habits):
+            if h.id == habit_id:
+                del habits[i]
+        self.delete_mode(update, context)
+
+    def mark_habit(
+        self,
+        update: Update,
+        context: CallbackContext,
+        habit_id: str,
+    ) -> None:
+        habits = self._habits(context)
+        for h in habits:
+            if h.id == habit_id:
+                h.state = StateHabit.DONE
         self._view.update_habit(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,

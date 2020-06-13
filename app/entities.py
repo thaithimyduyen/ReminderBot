@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 import enum
+import uuid
 
 MessageId = str
 ChatId = str
 
 
 class LevelHabit(enum.Enum):
-    EASY = "0"
-    MEDIUM = "1"
-    HARD = "2"
+    EASY = 1
+    MEDIUM = 2
+    HARD = 3
 
 
 class StateHabit(enum.Enum):
-    DONE = "1"
-    NOT_DONE = "0"
+    DONE = 1
+    NOT_DONE = 0
 
 
 class Mark(enum.Enum):
     DONE = "✅"
     NOT_DONE = "⬜"
+    DELETE = "🗑"
 
 
 class Habit:
@@ -27,6 +29,7 @@ class Habit:
     ):
         self.name = name
         self.state = StateHabit.NOT_DONE
+        self.id = str(uuid.uuid1())
         # self.level = LevelHabit.EASY
 
     def __repr__(self):

@@ -18,16 +18,39 @@ class ReminderBotViewer:
         self._bot = bot
 
     @staticmethod
-    def _get_habit_markup(habits: List[Habit]):
+    def _get_habit_markup(
+        habits: List[Habit],
+        is_state_delete=None,
+    ) -> InlineKeyboardMarkup:
         keyboard = []
         for h in habits:
             mark = Mark.DONE if h.state == StateHabit.DONE else Mark.NOT_DONE
+            callback_prefix = "habits:"
+
+            if is_state_delete:
+                mark = Mark.DELETE
+                callback_prefix = "delete:"
+
             keyboard.append([
                 InlineKeyboardButton(
-                    text=mark.value + h.name,
-                    callback_data="habits:"+str(habits.index(h))
-                )]
-            )
+                    text=mark.value + " " + h.name,
+                    callback_data=callback_prefix + h.id,
+                )
+            ])
+        if is_state_delete:
+            keyboard.append([
+                InlineKeyboardButton(
+                    text="Back to list of habits",
+                    callback_data="back"
+                )
+            ])
+        else:
+            keyboard.append([
+                InlineKeyboardButton(
+                    text="Delete Habbit",
+                    callback_data="delete mode"
+                )
+            ])
         return InlineKeyboardMarkup(keyboard)
 
     def send_message_reply(
@@ -69,9 +92,10 @@ class ReminderBotViewer:
         self,
         chat_id: ChatId,
         message_id: MessageId,
-        habits: List[Habit]
+        habits: List[Habit],
+        is_state_delete=False,
     ) -> None:
-        markup = self._get_habit_markup(habits)
+        markup = self._get_habit_markup(habits, is_state_delete)
         self._bot.edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,
