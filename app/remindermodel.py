@@ -5,7 +5,7 @@ from telegram import Update, Bot
 from telegram.ext import CallbackContext
 
 from app.reminderview import ReminderBotViewer
-from app.entities import Habit, StateHabit
+from app.entities import Habit
 
 KEY_USER_HABBITS = "habits"
 
@@ -94,7 +94,7 @@ class ReminderBotModel:
         habits = self._habits(context)
         for h in habits:
             if h.id == habit_id:
-                h.state = StateHabit.DONE
+                h.is_done ^= True
         self._view.update_habit(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,

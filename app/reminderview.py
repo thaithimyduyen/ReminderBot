@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from typing import List
-from app.entities import Habit, Mark, StateHabit, MessageId, ChatId
+from app.entities import Habit, Mark, MessageId, ChatId
 
 from telegram import (
     ParseMode,
@@ -24,7 +24,7 @@ class ReminderBotViewer:
     ) -> InlineKeyboardMarkup:
         keyboard = []
         for h in habits:
-            mark = Mark.DONE if h.state == StateHabit.DONE else Mark.NOT_DONE
+            mark = Mark.DONE if h.is_done else Mark.NOT_DONE
             callback_prefix = "habits:"
 
             if is_state_delete:
@@ -33,7 +33,7 @@ class ReminderBotViewer:
 
             keyboard.append([
                 InlineKeyboardButton(
-                    text=mark.value + " " + h.name,
+                    text=mark.value + h.name,
                     callback_data=callback_prefix + h.id,
                 )
             ])
