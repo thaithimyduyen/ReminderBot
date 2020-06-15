@@ -10,6 +10,7 @@ from app.reminderview import ReminderBotViewer
 from app.entities import Habit
 
 DAYS_OF_THE_WEEK = 7
+FILE_STICKER = "assets/sticker.webp"
 
 KEY_USER_HABBITS = "habits"
 KEY_LAST_START_DATE = "last_date_start"
@@ -104,7 +105,7 @@ class ReminderBotModel:
 
     def normal_mode(self, update: Update, context: CallbackContext) -> None:
         habits = self._habits(context)
-        self._view.update_habit(
+        self._view.update_habits(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
             habits=habits
@@ -112,7 +113,7 @@ class ReminderBotModel:
 
     def delete_mode(self, update: Update, context: CallbackContext) -> None:
         habits = self._habits(context)
-        self._view.update_habit(
+        self._view.update_habits(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
             habits=habits,
@@ -149,9 +150,19 @@ class ReminderBotModel:
             )
             return
 
+        count_done_habits = 0
         for h in habits:
             if h.id == habit_id:
                 h.is_done ^= True
+            if h.is_done:
+                count_done_habits += 1
+
+        if count_done_habits == len(habits):
+            with open(FILE_STICKER, 'rb') as f:
+                self._view.send_sticker(
+                    chat_id=chat_id,
+                    sticker=f,
+                )
 
         self._view.update_habits(
             chat_id=chat_id,

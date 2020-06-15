@@ -88,6 +88,12 @@ class ReminderBotViewer:
             parse_mode=ParseMode.MARKDOWN,
         )
 
+    def send_sticker(self, chat_id, sticker) -> None:
+        self._bot.send_sticker(
+            chat_id=chat_id,
+            sticker=sticker
+        )
+
     def update_habits(
         self,
         chat_id: ChatId,
