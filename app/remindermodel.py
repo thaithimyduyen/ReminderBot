@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import datetime
+
 from typing import List
 from telegram import Update, Bot
 from telegram.ext import CallbackContext
@@ -91,12 +93,24 @@ class ReminderBotModel:
         context: CallbackContext,
         habit_id: str,
     ) -> None:
+        chat_id = update.effective_message.chat_id
+        message_id = update.effective_message.message_id
         habits = self._habits(context)
+
+        time_sent_msg = update.effective_message.date.date()
+        if time_sent_msg != datetime.datetime.utcnow().date():
+            self._view.show_expired(
+                chat_id=chat_id,
+                message_id=message_id,
+            )
+            return
+
         for h in habits:
             if h.id == habit_id:
                 h.is_done ^= True
-        self._view.update_habit(
-            chat_id=update.effective_message.chat_id,
-            message_id=update.effective_message.message_id,
-            habits=habits
+
+        self._view.update_habits(
+            chat_id=chat_id,
+            message_id=message_id,
+            habits=habits,
         )

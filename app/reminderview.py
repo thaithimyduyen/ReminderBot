@@ -88,7 +88,7 @@ class ReminderBotViewer:
             parse_mode=ParseMode.MARKDOWN,
         )
 
-    def update_habit(
+    def update_habits(
         self,
         chat_id: ChatId,
         message_id: MessageId,
@@ -100,4 +100,15 @@ class ReminderBotViewer:
             chat_id=chat_id,
             message_id=message_id,
             reply_markup=markup,
+        )
+
+    def show_expired(
+        self,
+        chat_id: ChatId,
+        message_id: MessageId,
+    ) -> None:
+        self._bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text="The message is expired\nSend /start",
         )
