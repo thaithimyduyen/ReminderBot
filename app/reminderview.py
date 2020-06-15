@@ -78,7 +78,7 @@ class ReminderBotViewer:
             parse_mode=ParseMode.MARKDOWN
         ).message_id
 
-    def send_message(self, chat_id, context, text) -> None:
+    def send_message(self, chat_id, text) -> None:
         reply_markup = ReplyKeyboardMarkup(
             CUSTOM_KEYBOARD, resize_keyboard=True)
         self._bot.send_message(

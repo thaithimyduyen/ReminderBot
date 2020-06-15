@@ -9,7 +9,12 @@ from telegram.ext import CallbackContext
 from app.reminderview import ReminderBotViewer
 from app.entities import Habit
 
+DAYS_OF_THE_WEEK = 7
+
 KEY_USER_HABBITS = "habits"
+KEY_LAST_START_DATE = "last_date_start"
+KEY_WEEK_SCORE = "week_score"
+KEY_LAST_YEAR_WEEK = "number_week_year"
 
 
 class ReminderBotModel:
@@ -25,6 +30,14 @@ class ReminderBotModel:
         return context.user_data[KEY_USER_HABBITS]
 
     def start(self, update: Update, context: CallbackContext) -> None:
+        current_time_start = datetime.datetime.utcnow().date()
+        last_start_time = context.user_data.get(
+            KEY_LAST_START_DATE, current_time_start
+        )
+        context.user_data[KEY_LAST_START_DATE] = current_time_start
+        if current_time_start != last_start_time:
+            self._handle_stats(update, context)
+
         habits = self._habits(context)
 
         if len(habits) == 0:
@@ -36,6 +49,37 @@ class ReminderBotModel:
             return
 
         self._show_habits(update, context)
+
+    def _handle_stats(self, update: Update, context: CallbackContext) -> None:
+        habits = self._habits(context)
+        yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+
+        count_done_habits = sum(
+            1 for h in habits if h.done_date == yesterday.date()
+        )
+        precent_done = round(count_done_habits*100/len(habits))
+        text = f"Yesterday you completed {precent_done}% of your habits"
+
+        if KEY_WEEK_SCORE not in context.user_data:
+            context.user_data[KEY_WEEK_SCORE] = 0
+
+        current_year_week = yesterday.isocalendar()[:2]
+        last_year_week = context.user_data.get(
+            KEY_LAST_YEAR_WEEK, current_year_week
+        )
+        if last_year_week == current_year_week:
+            context.user_data[KEY_WEEK_SCORE] += precent_done
+        else:
+            score = round(context.user_data[KEY_WEEK_SCORE] / DAYS_OF_THE_WEEK)
+            text += f"Your last week score is {score}"
+            context.user_data[KEY_WEEK_SCORE] = 0
+
+        context.user_data[KEY_LAST_YEAR_WEEK] = current_year_week
+
+        self._view.send_message(
+            chat_id=update.effective_message.chat_id,
+            text=text,
+        )
 
     def add_habits(self, update: Update, context: CallbackContext) -> None:
         habits = self._habits(context)
