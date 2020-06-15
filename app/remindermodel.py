@@ -44,7 +44,6 @@ class ReminderBotModel:
         if len(habits) == 0:
             self._view.send_message(
                 chat_id=update.effective_message.chat_id,
-                context=context,
                 text="Add your habits!!"
             )
             return
