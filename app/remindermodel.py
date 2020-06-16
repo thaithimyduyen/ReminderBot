@@ -7,12 +7,15 @@ from telegram import Update, Bot
 from telegram.ext import CallbackContext
 
 from app.reminderview import ReminderBotViewer
-from app.entities import Habit
+from app.entities import Task, KindOfTask
+
+
+TODO_PREFIX = "#TODO "
 
 DAYS_OF_THE_WEEK = 7
 FILE_STICKER = "assets/sticker.webp"
 
-KEY_USER_HABBITS = "habits"
+KEY_USER_TASKS = "habits"
 KEY_LAST_START_DATE = "last_date_start"
 KEY_WEEK_SCORE = "week_score"
 KEY_LAST_YEAR_WEEK = "number_week_year"
@@ -24,11 +27,11 @@ class ReminderBotModel:
         self._bot = bot
 
     @staticmethod
-    def _habits(context: CallbackContext) -> List[Habit]:
-        if KEY_USER_HABBITS not in context.user_data:
-            context.user_data[KEY_USER_HABBITS] = []
+    def _tasks(context: CallbackContext) -> List[Task]:
+        if KEY_USER_TASKS not in context.user_data:
+            context.user_data[KEY_USER_TASKS] = []
 
-        return context.user_data[KEY_USER_HABBITS]
+        return context.user_data[KEY_USER_TASKS]
 
     def start(self, update: Update, context: CallbackContext) -> None:
         current_time_start = datetime.datetime.utcnow().date()
@@ -37,21 +40,27 @@ class ReminderBotModel:
         )
         context.user_data[KEY_LAST_START_DATE] = current_time_start
         if current_time_start != last_start_time:
-            self._handle_stats(update, context)
+            self._handle_stats_habits(update, context)
 
-        habits = self._habits(context)
+        tasks = self._tasks(context)
 
-        if len(habits) == 0:
+        if len(tasks) == 0:
             self._view.send_message(
                 chat_id=update.effective_message.chat_id,
-                text="Add your habits!!"
+                text="Add your tasks!!"
             )
             return
 
-        self._show_habits(update, context)
+        self._show_tasks(update, context)
 
-    def _handle_stats(self, update: Update, context: CallbackContext) -> None:
-        habits = self._habits(context)
+    def _handle_stats_habits(
+        self,
+        update: Update,
+        context: CallbackContext
+    ) -> None:
+        tasks = self._tasks(context)
+        habits = list(filter(lambda h: h.kind ==
+                             KindOfTask.HABIT, tasks))
         yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
 
         count_done_habits = sum(
@@ -81,54 +90,86 @@ class ReminderBotModel:
             text=text,
         )
 
-    def add_habits(self, update: Update, context: CallbackContext) -> None:
-        habits = self._habits(context)
+    def add_tasks(
+        self,
+        update: Update,
+        context: CallbackContext
+    ) -> None:
+        tasks = self._tasks(context)
 
-        habits_inp = update.effective_message.text.splitlines()
+        tasks_inp = update.effective_message.text.splitlines()
 
-        unique_habit_names = set()
-        for h in habits:
-            unique_habit_names.add(h.name)
+        unique_task_names = set()
+        for h in tasks:
+            unique_task_names.add(h.name)
 
-        for h in habits_inp:
-            if h in unique_habit_names:
+        for h in tasks_inp:
+            if h in unique_task_names:
                 continue
-            unique_habit_names.add(h)
-            habits.append(Habit(h))
+            task = Task(h)
+            if h.upper().startswith(TODO_PREFIX):
+                task.kind = KindOfTask.TODO
+                task.name = h[len(TODO_PREFIX):]
+                if len(task.name.strip()) == 0:
+                    continue
 
-        self._show_habits(update, context)
+            unique_task_names.add(h)
+            tasks.append(task)
 
-    def _show_habits(self, update: Update, context: CallbackContext) -> None:
-        habits = self._habits(context)
-        self._view.send_habits(update.effective_message.chat_id, habits)
+        self._show_tasks(update, context)
+
+    def _show_tasks(
+        self,
+        update: Update,
+        context: CallbackContext
+    ) -> None:
+        tasks = self._tasks(context)
+        self._view.send_tasks(
+            update.effective_message.chat_id, tasks)
 
     def normal_mode(self, update: Update, context: CallbackContext) -> None:
-        habits = self._habits(context)
-        self._view.update_habits(
+        tasks = self._tasks(context)
+        self._view.update_tasks(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
-            habits=habits
+            tasks=tasks
         )
 
     def delete_mode(self, update: Update, context: CallbackContext) -> None:
-        habits = self._habits(context)
-        self._view.update_habits(
+        tasks = self._tasks(context)
+        self._view.update_tasks(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
-            habits=habits,
+            tasks=tasks,
             is_state_delete=True,
         )
 
-    def delete_habit(
+    def complete_todo(
         self,
         update: Update,
         context: CallbackContext,
-        habit_id: str,
+        todo_id: str
     ) -> None:
-        habits = self._habits(context)
-        for (i, h) in enumerate(habits):
-            if h.id == habit_id:
-                del habits[i]
+        tasks = self._tasks(context)
+        for (i, h) in enumerate(tasks):
+            if h.id == todo_id:
+                del tasks[i]
+        self._view.update_tasks(
+            chat_id=update.effective_message.chat_id,
+            message_id=update.effective_message.message_id,
+            tasks=tasks,
+        )
+
+    def delete_task(
+        self,
+        update: Update,
+        context: CallbackContext,
+        task_id: str,
+    ) -> None:
+        tasks = self._tasks(context)
+        for (i, h) in enumerate(tasks):
+            if h.id == task_id:
+                del tasks[i]
         self.delete_mode(update, context)
 
     def mark_habit(
@@ -139,7 +180,9 @@ class ReminderBotModel:
     ) -> None:
         chat_id = update.effective_message.chat_id
         message_id = update.effective_message.message_id
-        habits = self._habits(context)
+        tasks = self._tasks(context)
+        habits = list(filter(lambda h: h.kind ==
+                             KindOfTask.HABIT, tasks))
 
         time_sent_msg = update.effective_message.date.date()
         if time_sent_msg != datetime.datetime.utcnow().date():
@@ -163,8 +206,8 @@ class ReminderBotModel:
                     sticker=f,
                 )
 
-        self._view.update_habits(
+        self._view.update_tasks(
             chat_id=chat_id,
             message_id=message_id,
-            habits=habits,
+            tasks=tasks,
         )

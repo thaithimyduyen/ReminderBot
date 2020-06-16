@@ -14,19 +14,25 @@ class LevelHabit(enum.Enum):
 
 
 class Mark(enum.Enum):
-    DONE = "✅"
-    NOT_DONE = "⬜"
-    DELETE = "🗑"
+    DONE = "✅ "
+    NOT_DONE = "⬜ "
+    DELETE = "🗑 "
+    TODO = "📝 "
 
 
-class Habit:
+class KindOfTask(enum.Enum):
+    HABIT = "habit"
+    TODO = "todo"
+
+
+class Task:
     def __init__(
         self, name
     ):
+        self.kind = KindOfTask.HABIT
         self.name = name
         self.id = str(uuid.uuid1())
         self.__done_time = datetime.datetime.fromtimestamp(0)
-        # self.level = LevelHabit.EASY
 
     @property
     def is_done(self):

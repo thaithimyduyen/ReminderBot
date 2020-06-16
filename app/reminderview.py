@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from typing import List
-from app.entities import Habit, Mark, MessageId, ChatId
+from app.entities import Task, Mark, MessageId, ChatId, KindOfTask
 
 from telegram import (
     ParseMode,
@@ -18,36 +18,39 @@ class ReminderBotViewer:
         self._bot = bot
 
     @staticmethod
-    def _get_habit_markup(
-        habits: List[Habit],
+    def _get_task_markup(
+        tasks: List[Task],
         is_state_delete=None,
     ) -> InlineKeyboardMarkup:
         keyboard = []
-        for h in habits:
-            mark = Mark.DONE if h.is_done else Mark.NOT_DONE
-            callback_prefix = "habits:"
-
+        for t in tasks:
             if is_state_delete:
                 mark = Mark.DELETE
                 callback_prefix = "delete:"
+            elif t.kind == KindOfTask.TODO:
+                mark = Mark.TODO
+                callback_prefix = "todos:"
+            else:
+                mark = Mark.DONE if t.is_done else Mark.NOT_DONE
+                callback_prefix = "habits:"
 
             keyboard.append([
                 InlineKeyboardButton(
-                    text=mark.value + h.name,
-                    callback_data=callback_prefix + h.id,
+                    text=mark.value + t.name,
+                    callback_data=callback_prefix + t.id,
                 )
             ])
         if is_state_delete:
             keyboard.append([
                 InlineKeyboardButton(
-                    text="Back to list of habits",
+                    text="Back to list",
                     callback_data="back"
                 )
             ])
         else:
             keyboard.append([
                 InlineKeyboardButton(
-                    text="Delete Habbit",
+                    text="Delete Habit",
                     callback_data="delete mode"
                 )
             ])
@@ -69,11 +72,11 @@ class ReminderBotViewer:
             reply_markup=reply_markup,
         )
 
-    def send_habits(self, chat_id, habits: List[Habit]):
-        markup = self._get_habit_markup(habits)
+    def send_tasks(self, chat_id, tasks: List[Task]):
+        markup = self._get_task_markup(tasks)
         return self._bot.send_message(
             chat_id=chat_id,
-            text="*YOUR HABBITS:*",
+            text="*YOUR HABITS AND TODOS:*",
             reply_markup=markup,
             parse_mode=ParseMode.MARKDOWN
         ).message_id
@@ -94,14 +97,14 @@ class ReminderBotViewer:
             sticker=sticker
         )
 
-    def update_habits(
+    def update_tasks(
         self,
         chat_id: ChatId,
         message_id: MessageId,
-        habits: List[Habit],
+        tasks: List[Task],
         is_state_delete=False,
     ) -> None:
-        markup = self._get_habit_markup(habits, is_state_delete)
+        markup = self._get_task_markup(tasks, is_state_delete)
         self._bot.edit_message_reply_markup(
             chat_id=chat_id,
             message_id=message_id,

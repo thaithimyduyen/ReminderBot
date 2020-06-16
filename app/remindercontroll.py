@@ -34,7 +34,7 @@ class ReminderBotCotroller:
         self._model.start(update, context)
 
     def _handle_text(self, update: Update, context: CallbackContext) -> None:
-        self._model.add_habits(update, context)
+        self._model.add_tasks(update, context)
 
     def _handle_button_clicked(
         self,
@@ -48,11 +48,17 @@ class ReminderBotCotroller:
                 context=context,
                 habit_id=trim_prefix(query_data, "habits:")
             )
-        elif query_data.startswith("delete:"):
-            self._model.delete_habit(
+        elif query_data.startswith("todos:"):
+            self._model.complete_todo(
                 update=update,
                 context=context,
-                habit_id=trim_prefix(query_data, "delete:")
+                todo_id=trim_prefix(query_data, "todos:")
+            )
+        elif query_data.startswith("delete:"):
+            self._model.delete_task(
+                update=update,
+                context=context,
+                task_id=trim_prefix(query_data, "delete:")
             )
         elif query_data == "delete mode":
             self._model.delete_mode(
