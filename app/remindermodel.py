@@ -34,7 +34,22 @@ class ReminderBotModel:
         return context.user_data[KEY_USER_TASKS]
 
     def start(self, update: Update, context: CallbackContext) -> None:
+        chat_id = update.effective_message.chat_id
         current_time_start = datetime.datetime.utcnow().date()
+
+        if KEY_LAST_START_DATE not in context.user_data:
+            self._view.send_message(
+                chat_id=chat_id,
+                text="Welcome to the Reminder Bot!\n\n" +
+                "You can add your habits and todo tasks whenever you want" +
+                " by sending to the bot a simple message.\n\n"
+                "Command /start for getting a list of your tasks\n\n" +
+                "For creating a TODO task put #TODO at the beginning " +
+                "of the task message."
+            )
+            context.user_data[KEY_LAST_START_DATE] = current_time_start
+            return
+
         last_start_time = context.user_data.get(
             KEY_LAST_START_DATE, current_time_start
         )
@@ -46,7 +61,7 @@ class ReminderBotModel:
 
         if len(tasks) == 0:
             self._view.send_message(
-                chat_id=update.effective_message.chat_id,
+                chat_id=chat_id,
                 text="Add your tasks!!"
             )
             return
