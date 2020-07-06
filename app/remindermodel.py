@@ -8,7 +8,7 @@ from telegram import Update, Bot
 from telegram.ext import CallbackContext
 
 from app.reminderview import ReminderBotViewer
-from app.entities import Task, KindOfTask
+from app.entities import Task, KindOfTask, ChatId
 from app.repository import TaskRepository
 
 TODO_PREFIX = "#TODO "
@@ -87,22 +87,6 @@ class ReminderBotModel:
         precent_done = round(count_done_habits*100/len(habits))
         text = f"Yesterday you completed {precent_done}% of your habits"
 
-        if KEY_WEEK_SCORE not in context.user_data:
-            context.user_data[KEY_WEEK_SCORE] = 0
-
-        current_year_week = yesterday.isocalendar()[:2]
-        last_year_week = context.user_data.get(
-            KEY_LAST_YEAR_WEEK, current_year_week
-        )
-        if last_year_week == current_year_week:
-            context.user_data[KEY_WEEK_SCORE] += precent_done
-        else:
-            score = round(context.user_data[KEY_WEEK_SCORE] / DAYS_OF_THE_WEEK)
-            text += f"Your last week score is {score}"
-            context.user_data[KEY_WEEK_SCORE] = 0
-
-        context.user_data[KEY_LAST_YEAR_WEEK] = current_year_week
-
         self._view.send_message(
             chat_id=update.effective_message.chat_id,
             text=text,
@@ -138,10 +122,30 @@ class ReminderBotModel:
         self._view.send_tasks(
             update.effective_message.chat_id, tasks)
 
+    def check_all_habits_done(
+        self,
+        tasks: List[Task],
+        chat_id: ChatId
+    ) -> None:
+        habits = list(filter(lambda h: h.kind ==
+                             KindOfTask.HABIT, tasks))
+        count_done_habits = 0
+        for h in habits:
+            if h.is_done:
+                count_done_habits += 1
+        if count_done_habits == len(habits):
+            with open(FILE_STICKER, 'rb') as f:
+                self._view.send_sticker(
+                    chat_id=chat_id,
+                    sticker=f,
+                )
+
     def normal_mode(self, update: Update, context: CallbackContext) -> None:
         tasks = self._tasks_by_callback(update)
+        chat_id = update.effective_message.chat_id
+        self.check_all_habits_done(tasks, chat_id)
         self._view.update_tasks(
-            chat_id=update.effective_message.chat_id,
+            chat_id=chat_id,
             message_id=update.effective_message.message_id,
             tasks=tasks
         )
@@ -211,26 +215,13 @@ class ReminderBotModel:
             )
             return
 
-        count_done_habits = 0
         for h in habits:
             if h.id == habit_id:
                 h.is_done ^= True
                 self._task_repository.add(h, user_id)
 
         tasks = self._tasks_by_callback(update)
-        habits = list(filter(lambda h: h.kind ==
-                             KindOfTask.HABIT, tasks))
-
-        for h in habits:
-            if h.is_done:
-                count_done_habits += 1
-        if count_done_habits == len(habits):
-            with open(FILE_STICKER, 'rb') as f:
-                self._view.send_sticker(
-                    chat_id=chat_id,
-                    sticker=f,
-                )
-
+        self.check_all_habits_done(tasks, chat_id)
         self._view.update_tasks(
             chat_id=chat_id,
             message_id=message_id,
