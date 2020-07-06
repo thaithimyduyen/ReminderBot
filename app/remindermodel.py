@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
+import redis
 
 from typing import List
 from telegram import Update, Bot
@@ -8,7 +9,7 @@ from telegram.ext import CallbackContext
 
 from app.reminderview import ReminderBotViewer
 from app.entities import Task, KindOfTask
-
+from app.repository import TaskRepository
 
 TODO_PREFIX = "#TODO "
 
@@ -22,16 +23,18 @@ KEY_LAST_YEAR_WEEK = "number_week_year"
 
 
 class ReminderBotModel:
-    def __init__(self, view: ReminderBotViewer, bot: Bot):
+    def __init__(self, view: ReminderBotViewer, bot: Bot, kv: redis.Redis):
         self._view = view
         self._bot = bot
+        self._task_repository = TaskRepository(kv)
 
-    @staticmethod
-    def _tasks(context: CallbackContext) -> List[Task]:
-        if KEY_USER_TASKS not in context.user_data:
-            context.user_data[KEY_USER_TASKS] = []
+    def _tasks_by_callback(self, update: Update) -> List[Task]:
+        user_id = update.callback_query.from_user.id
+        return self._task_repository.get_all(user_id)
 
-        return context.user_data[KEY_USER_TASKS]
+    def _tasks_by_message(self, update: Update) -> List[Task]:
+        user_id = update.effective_message.from_user.id
+        return self._task_repository.get_all(user_id)
 
     def start(self, update: Update, context: CallbackContext) -> None:
         chat_id = update.effective_message.chat_id
@@ -57,7 +60,7 @@ class ReminderBotModel:
         if current_time_start != last_start_time:
             self._handle_stats_habits(update, context)
 
-        tasks = self._tasks(context)
+        tasks = self._tasks_by_message(update)
 
         if len(tasks) == 0:
             self._view.send_message(
@@ -73,7 +76,7 @@ class ReminderBotModel:
         update: Update,
         context: CallbackContext
     ) -> None:
-        tasks = self._tasks(context)
+        tasks = self._tasks_by_message(context)
         habits = list(filter(lambda h: h.kind ==
                              KindOfTask.HABIT, tasks))
         yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
@@ -110,17 +113,11 @@ class ReminderBotModel:
         update: Update,
         context: CallbackContext
     ) -> None:
-        tasks = self._tasks(context)
+        user_id = update.effective_message.from_user.id
 
         tasks_inp = update.effective_message.text.splitlines()
 
-        unique_task_names = set()
-        for h in tasks:
-            unique_task_names.add(h.name)
-
         for h in tasks_inp:
-            if h in unique_task_names:
-                continue
             task = Task(h)
             if h.upper().startswith(TODO_PREFIX):
                 task.kind = KindOfTask.TODO
@@ -128,8 +125,7 @@ class ReminderBotModel:
                 if len(task.name.strip()) == 0:
                     continue
 
-            unique_task_names.add(h)
-            tasks.append(task)
+            self._task_repository.add(task, user_id)
 
         self._show_tasks(update, context)
 
@@ -138,12 +134,12 @@ class ReminderBotModel:
         update: Update,
         context: CallbackContext
     ) -> None:
-        tasks = self._tasks(context)
+        tasks = self._tasks_by_message(update)
         self._view.send_tasks(
             update.effective_message.chat_id, tasks)
 
     def normal_mode(self, update: Update, context: CallbackContext) -> None:
-        tasks = self._tasks(context)
+        tasks = self._tasks_by_callback(update)
         self._view.update_tasks(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
@@ -151,7 +147,8 @@ class ReminderBotModel:
         )
 
     def delete_mode(self, update: Update, context: CallbackContext) -> None:
-        tasks = self._tasks(context)
+        tasks = self._tasks_by_callback(update)
+
         self._view.update_tasks(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
@@ -165,10 +162,14 @@ class ReminderBotModel:
         context: CallbackContext,
         todo_id: str
     ) -> None:
-        tasks = self._tasks(context)
-        for (i, h) in enumerate(tasks):
-            if h.id == todo_id:
-                del tasks[i]
+        user_id = update.callback_query.from_user.id
+        tasks = self._tasks_by_callback(update)
+
+        for task in tasks:
+            if task.id == todo_id:
+                self._task_repository.delete(user_id, task)
+        tasks = self._tasks_by_callback(update)
+
         self._view.update_tasks(
             chat_id=update.effective_message.chat_id,
             message_id=update.effective_message.message_id,
@@ -181,10 +182,11 @@ class ReminderBotModel:
         context: CallbackContext,
         task_id: str,
     ) -> None:
-        tasks = self._tasks(context)
-        for (i, h) in enumerate(tasks):
-            if h.id == task_id:
-                del tasks[i]
+        user_id = update.callback_query.from_user.id
+        tasks = self._tasks_by_callback(update)
+        for task in tasks:
+            if task.id == task_id:
+                self._task_repository.delete(user_id, task)
         self.delete_mode(update, context)
 
     def mark_habit(
@@ -195,7 +197,9 @@ class ReminderBotModel:
     ) -> None:
         chat_id = update.effective_message.chat_id
         message_id = update.effective_message.message_id
-        tasks = self._tasks(context)
+        user_id = update.callback_query.from_user.id
+
+        tasks = self._tasks_by_callback(update)
         habits = list(filter(lambda h: h.kind ==
                              KindOfTask.HABIT, tasks))
 
@@ -211,9 +215,15 @@ class ReminderBotModel:
         for h in habits:
             if h.id == habit_id:
                 h.is_done ^= True
+                self._task_repository.add(h, user_id)
+
+        tasks = self._tasks_by_callback(update)
+        habits = list(filter(lambda h: h.kind ==
+                             KindOfTask.HABIT, tasks))
+
+        for h in habits:
             if h.is_done:
                 count_done_habits += 1
-
         if count_done_habits == len(habits):
             with open(FILE_STICKER, 'rb') as f:
                 self._view.send_sticker(

@@ -22,6 +22,7 @@ class ReminderBotViewer:
         tasks: List[Task],
         is_state_delete=None,
     ) -> InlineKeyboardMarkup:
+        tasks = sorted(tasks, key=lambda task: task.kind.value)
         keyboard = []
         for t in tasks:
             if is_state_delete:

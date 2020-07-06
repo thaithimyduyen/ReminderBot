@@ -3,8 +3,12 @@ import enum
 import uuid
 import datetime
 
+from dataclasses import dataclass
+from dataclasses_json import dataclass_json
+
 MessageId = str
 ChatId = str
+UserId = int
 
 
 class LevelHabit(enum.Enum):
@@ -25,14 +29,27 @@ class KindOfTask(enum.Enum):
     TODO = "todo"
 
 
+@dataclass_json
+@dataclass
 class Task:
+    kind: KindOfTask
+    name: str
+    id: str
+    __done_time: datetime.datetime
+
     def __init__(
-        self, name
+        self,
+        name,
+        id=None,
+        kind=KindOfTask.HABIT,
+        __done_time: datetime.datetime = datetime.datetime.fromtimestamp(0),
     ):
-        self.kind = KindOfTask.HABIT
+        self.kind = kind
         self.name = name
-        self.id = str(uuid.uuid1())
-        self.__done_time = datetime.datetime.fromtimestamp(0)
+        if id is None:
+            id = str(uuid.uuid1())
+        self.id = id
+        self.__done_time = __done_time
 
     @property
     def is_done(self):
