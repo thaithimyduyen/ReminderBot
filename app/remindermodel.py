@@ -18,8 +18,6 @@ FILE_STICKER = "assets/sticker.webp"
 
 KEY_USER_TASKS = "habits"
 KEY_LAST_START_DATE = "last_date_start"
-KEY_WEEK_SCORE = "week_score"
-KEY_LAST_YEAR_WEEK = "number_week_year"
 
 
 class ReminderBotModel:
@@ -38,9 +36,10 @@ class ReminderBotModel:
 
     def start(self, update: Update, context: CallbackContext) -> None:
         chat_id = update.effective_message.chat_id
-        current_time_start = datetime.datetime.utcnow().date()
+        user_id = update.effective_message.from_user.id
+        current_time_start = datetime.datetime.utcnow().strftime("%d/%m/%y")
 
-        if KEY_LAST_START_DATE not in context.user_data:
+        if self._task_repository.get_last_start(user_id) == "":
             self._view.send_message(
                 chat_id=chat_id,
                 text="Welcome to the Reminder Bot!\n\n" +
@@ -50,13 +49,12 @@ class ReminderBotModel:
                 "For creating a TODO task put #TODO at the beginning " +
                 "of the task message."
             )
-            context.user_data[KEY_LAST_START_DATE] = current_time_start
+            self._task_repository.set_last_start(user_id, current_time_start)
             return
 
-        last_start_time = context.user_data.get(
-            KEY_LAST_START_DATE, current_time_start
-        )
-        context.user_data[KEY_LAST_START_DATE] = current_time_start
+        last_start_time = self._task_repository.get_last_start(user_id)
+
+        self._task_repository.set_last_start(user_id, current_time_start)
         if current_time_start != last_start_time:
             self._handle_stats_habits(update, context)
 
@@ -76,9 +74,11 @@ class ReminderBotModel:
         update: Update,
         context: CallbackContext
     ) -> None:
-        tasks = self._tasks_by_message(context)
+        tasks = self._tasks_by_message(update)
         habits = list(filter(lambda h: h.kind ==
                              KindOfTask.HABIT, tasks))
+        if len(habits) == 0:
+            return
         yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
 
         count_done_habits = sum(
